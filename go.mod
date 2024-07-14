@@ -3,7 +3,7 @@ module go-template
 go 1.21.4
 
 require (
-	github.com/hashicorp/go-retryablehttp v0.7.5
+	github.com/hashicorp/go-retryablehttp v0.7.7
 	go.elastic.co/apm v1.15.0
 	go.elastic.co/apm/module/apmhttp v1.15.0
 )
@@ -22,7 +22,7 @@ require (
 	go.elastic.co/fastjson v1.1.0 // indirect
 	golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5 // indirect
 	golang.org/x/mod v0.3.0 // indirect
-	golang.org/x/sys v0.0.0-20191204072324-ce4227a45e2e // indirect
+	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/tools v0.0.0-20200509030707-2212a7e161a5 // indirect
 	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 // indirect
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb // indirect
