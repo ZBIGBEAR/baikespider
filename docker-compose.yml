@@ -1,0 +1,40 @@
+version: "3.9"
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GH_ACCESS_TOKEN: $GH_ACCESS_TOKEN
+    container_name: go-template
+    security_opt:
+      - seccomp:unconfined
+    restart: always
+    env_file: ./.env
+    volumes:
+      - ./:/app
+    ports:
+      - 8080:8080
+      - 50051:50051
+      - 2346:2345
+    platform: linux/x86_64
+  postgres:
+    image: bitnami/postgresql:9.6
+    container_name: test_postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    networks:
+      - test-network
+    environment:
+      - POSTGRESQL_USERNAME=your-name
+      - POSTGRESQL_PASSWORD=your-password
+      - POSTGRESQL_POSTGRES_PASSWORD=postgres
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+
+volumes:
+  pg-data:
+networks:
+  test-network:
+    name: test-network

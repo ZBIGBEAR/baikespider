@@ -1,0 +1,59 @@
+name: Go
+
+on:
+  push:
+    branches: [ master, develop ]
+  pull_request:
+    branches: [ master, develop ]
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    env:
+      GH_ACCESS_TOKEN: ${{ secrets.GH_TOKEN }}
+    steps:
+      - uses: actions/setup-go@v3
+        with:
+          go-version: "1.19.2"
+      - uses: actions/checkout@v2
+      - name: set GOPRIVATE
+        run: git config --global url.https://$GH_ACCESS_TOKEN@github.com/.insteadOf https://github.com/
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3.2.0
+        with:
+          version: v1.48
+          skip-cache: true
+      - name: Notify Test Failed
+        if: ${{ failure() }}
+        run: |
+          author=${{ github.actor }}
+          curl --location --request POST 'https://xxx/api/feishu/msg' --header 'Content-Type: application/json' --data-raw "{\"author\":\"$author\",\"branch\":\"${{ github.ref_name }}\",\"repository\":\"${{ github.repository }}\",\"address\":\"${{ github.repository }}\",\"url\":\"${{ secrets.FEISHU_WEBHOOK }}\", \"id\":\"${{ github.run_id }}\"}"
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+    env:
+      GH_ACCESS_TOKEN: ${{ secrets.GH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Go
+        with:
+          go-version: "1.19.2"
+        uses: actions/setup-go@v2
+      - name: set GOPRIVATE
+        run: git config --global url.https://$GH_ACCESS_TOKEN@github.com/.insteadOf https://github.com/
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: tests
+        run: GOLANG_PROTOBUF_REGISTRATION_CONFLICT=warn go test -cover -race ./internal/... -count 1
+      - name: Notify Test Failed
+        if: ${{ failure() }}
+        run: |
+          author=${{ github.actor }}
+          curl --location --request POST 'https://xxx/api/feishu/msg' --header 'Content-Type: application/json' --data-raw "{\"author\":\"$author\",\"branch\":\"${{ github.ref_name }}\",\"repository\":\"${{ github.repository }}\",\"address\":\"${{ github.repository }}\",\"url\":\"${{ secrets.FEISHU_WEBHOOK }}\", \"id\":\"${{ github.run_id }}\"}"

@@ -1,0 +1,73 @@
+# This is a basic workflow to help you get started with Actions
+
+name: OnlineDeploy
+
+concurrency: 
+  group: ${{ github.ref_name }}
+  cancel-in-progress: true
+
+env: # 设置时区
+  TZ: Asia/Shanghai
+
+# Controls when the action will run. 
+#on:
+#  push:
+#    branches:
+#      - '**'
+on:
+  push:
+    branches:
+      - master
+      - main
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  setup-test-build:
+    runs-on: ubuntu-latest
+    env:
+      GH_ACCESS_TOKEN: ${{ secrets.GH_TOKEN }}
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+
+      - name: Setup golang environment
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.17.5
+
+      - name: set GOPRIVATE
+        run: git config --global url.https://$GH_ACCESS_TOKEN@github.com/.insteadOf https://github.com/
+
+      - name: Cache go mod
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Unit Tests
+        run: "go test \
+          -v \
+          -race \
+          -covermode atomic \
+          -coverprofile=coverage.txt \
+          ./internal/..."
+
+
+  deploy:  
+    name: run deploy
+    needs: setup-test-build
+    runs-on: ubuntu-latest
+    if: ${{ github.ref_name == 'develop' || contains(github.ref_name,'release-') }}
+
+    steps:
+    - name: Trigger jenkins deploy
+      env:
+        JENKINS_TOKEN: ${{ secrets.JENKINS_TOKEN }}
+        JENKINS_USER: ${{ secrets.JENKINS_USER }}
+        JENKINS_URL: ${{ secrets.JENKINS_URL }}
+        BRANCH_NAME: ${{ github.ref_name }}
+        REPOSITORY: ${{ github.repository }}
+      run: curl -u $JENKINS_USER:$JENKINS_TOKEN -X POST "${JENKINS_URL}/job/build-deploy-golang/buildWithParameters?productName=${REPOSITORY}&branchName=${BRANCH_NAME}"

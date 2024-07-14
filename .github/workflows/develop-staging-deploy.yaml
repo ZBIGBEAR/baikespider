@@ -1,0 +1,76 @@
+# This is a basic workflow to help you get started with Actions
+
+name: DevelopStagingDeploy
+
+concurrency: 
+  group: ${{ github.ref_name }}
+  cancel-in-progress: true
+
+env: # 设置时区
+  TZ: Asia/Shanghai
+
+# Controls when the action will run. 
+on:
+  push:
+    branches:
+      - develop
+      - staging
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  setup-test-build:
+    runs-on: ubuntu-latest
+    env:
+      GOPRIVATE: github.com
+      GH_ACCESS_TOKEN: ${{ secrets.GH_TOKEN }}
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+
+      - name: Setup golang environment
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.19.2
+
+      - name: set GOPRIVATE
+        run: git config --global url.https://$GH_ACCESS_TOKEN@github.com/.insteadOf https://github.com/
+
+      - name: Cache go mod
+        uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install Dependencies & Build
+        run: |
+          go env -w GO111MODULE=on
+          go install github.com/cosmtrek/air@latest
+          go install github.com/go-delve/delve/cmd/dlv@latest
+          go mod download
+          cp .env.example .env && make build
+          
+      - name: Notify Test Failed
+        if: ${{ failure() }}
+        run: |
+          author=${{ github.actor }}
+          curl --location --request POST 'https:///xxx/feishu/msg' --header 'Content-Type: application/json' --data-raw "{\"author\":\"$author\",\"branch\":\"${{ github.ref_name }}\",\"repository\":\"${{ github.repository }}\",\"address\":\"${{ github.repository }}\",\"url\":\"${{ secrets.FEISHU_WEBHOOK }}\", \"id\":\"${{ github.run_id }}\"}"
+
+  deploy:  
+    name: run deploy
+    needs: setup-test-build
+    runs-on: ubuntu-latest
+    if: ${{ github.ref_name == 'develop' || github.ref_name == 'staging' }}
+
+    steps:
+    - name: Trigger jenkins deploy
+      env:
+        JENKINS_TOKEN: ${{ secrets.JENKINS_TOKEN }}
+        JENKINS_USER: ${{ secrets.JENKINS_USER }}
+        JENKINS_URL: ${{ secrets.JENKINS_URL }}
+        BRANCH_NAME: ${{ github.ref_name }}
+        REPOSITORY: ${{ github.repository }}
+      run: curl -u $JENKINS_USER:$JENKINS_TOKEN -X POST "${JENKINS_URL}/job/build-deploy-golang/buildWithParameters?productName=${REPOSITORY}&branchName=${BRANCH_NAME}"
